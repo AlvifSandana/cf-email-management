@@ -1,5 +1,6 @@
 # Email Management Service (EMS)
 
+[![CI](https://github.com/AlvifSandana/cf-email-management/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/AlvifSandana/cf-email-management/actions/workflows/ci.yml)
 [![Go Version](https://img.shields.io/badge/Go-1.24+-00ADD8?style=flat&logo=go)](https://go.dev/)
 [![OpenAPI](https://img.shields.io/badge/OpenAPI-3.1-6BA539?style=flat&logo=openapiinitiative)](./api/openapi.yaml)
 [![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?style=flat&logo=docker)](./compose.prod.yaml)
@@ -7,6 +8,7 @@
 [![Status](https://img.shields.io/badge/Status-Production%20Ready-success.svg)](#development-status)
 
 **Email Management Service (EMS)** is a self-hosted control plane engineered for centrally managing **Cloudflare Email Routing** across multiple accounts and domains.
+
 
 It replaces repetitive manual Cloudflare dashboard workflows with a single, secure, idempotent REST API featuring automated synchronization, real-time drift detection, and tamper-resistant audit trails.
 
