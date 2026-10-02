@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -331,5 +332,27 @@ func TestRateLimiter(t *testing.T) {
 	}
 	if res3.Header().Get("Retry-After") != "60" {
 		t.Errorf("expected Retry-After 60 header")
+	}
+}
+
+func TestEmbeddedWebDashboard(t *testing.T) {
+	handler, _, _ := setupTestServer()
+
+	// GET /
+	res := doRequest(handler, http.MethodGet, "/", nil, "", nil)
+	if res.Code != http.StatusOK {
+		t.Fatalf("expected 200 for /, got %d", res.Code)
+	}
+	if !strings.Contains(res.Body.String(), "EMS — Email Management Service") {
+		t.Errorf("expected HTML body to contain dashboard title")
+	}
+
+	// GET /dashboard
+	res2 := doRequest(handler, http.MethodGet, "/dashboard", nil, "", nil)
+	if res2.Code != http.StatusOK {
+		t.Fatalf("expected 200 for /dashboard, got %d", res2.Code)
+	}
+	if !strings.Contains(res2.Body.String(), "EMS Control") {
+		t.Errorf("expected HTML body to contain EMS Control")
 	}
 }

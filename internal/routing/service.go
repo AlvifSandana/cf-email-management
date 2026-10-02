@@ -226,6 +226,10 @@ func (s *Service) CreateRule(ctx context.Context, zoneID string, req CreateRuleR
 		if err != nil || !verified {
 			return nil, domain.NewDestinationNotVerifiedError(req.Destination)
 		}
+	} else if req.ActionType == domain.ActionTypeWorker {
+		if req.Destination == "" {
+			return nil, domain.NewValidationError("worker name is required for worker action")
+		}
 	}
 
 	// Call provider
@@ -318,6 +322,10 @@ func (s *Service) UpdateRule(ctx context.Context, zoneID, ruleID string, req Cre
 		verified, err := s.destService.VerifyDestination(ctx, zone.ProviderAccountID, req.Destination)
 		if err != nil || !verified {
 			return nil, domain.NewDestinationNotVerifiedError(req.Destination)
+		}
+	} else if req.ActionType == domain.ActionTypeWorker {
+		if req.Destination == "" {
+			return nil, domain.NewValidationError("worker name is required for worker action")
 		}
 	}
 
@@ -478,6 +486,10 @@ func (s *Service) UpdateCatchAll(ctx context.Context, zoneID string, req CatchAl
 		verified, err := s.destService.VerifyDestination(ctx, zone.ProviderAccountID, req.Destination)
 		if err != nil || !verified {
 			return nil, domain.NewDestinationNotVerifiedError(req.Destination)
+		}
+	} else if req.Enabled && req.ActionType == domain.ActionTypeWorker {
+		if req.Destination == "" {
+			return nil, domain.NewValidationError("worker name is required for enabled worker catch-all")
 		}
 	}
 

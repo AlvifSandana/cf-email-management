@@ -141,7 +141,34 @@ func TestRoutingService_ExplicitRulesAndCatchAll(t *testing.T) {
 		t.Fatalf("failed to get catch-all: %v", err)
 	}
 
-	// 7. Delete Rule
+	// 7. Test Worker Action (Explicit Rule & Catch-All)
+	workerRule, err := routeService.CreateRule(ctx, zone.ID, CreateRuleRequest{
+		Name:         "Worker Handler",
+		MatcherValue: "worker@bariskode.com",
+		ActionType:   "worker",
+		Destination:  "my-email-worker",
+		Enabled:      true,
+	}, "req_worker_rule")
+	if err != nil {
+		t.Fatalf("failed to create worker rule: %v", err)
+	}
+	if workerRule.ActionType != "worker" || workerRule.Destination != "my-email-worker" {
+		t.Fatalf("expected worker action with my-email-worker, got %s -> %s", workerRule.ActionType, workerRule.Destination)
+	}
+
+	caWorker, err := routeService.UpdateCatchAll(ctx, zone.ID, CatchAllRequest{
+		Enabled:     true,
+		ActionType:  "worker",
+		Destination: "my-catchall-worker",
+	}, "req_ca_worker")
+	if err != nil {
+		t.Fatalf("failed to set catch-all to worker: %v", err)
+	}
+	if caWorker.ActionType != "worker" || caWorker.Destination != "my-catchall-worker" {
+		t.Fatalf("expected catch-all worker action, got %s -> %s", caWorker.ActionType, caWorker.Destination)
+	}
+
+	// 8. Delete Rule
 	err = routeService.DeleteRule(ctx, zone.ID, rule.ID, "req_rule_del")
 	if err != nil {
 		t.Fatalf("failed to delete rule: %v", err)

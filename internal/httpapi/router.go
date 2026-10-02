@@ -9,6 +9,7 @@ import (
 
 	"github.com/bariskode/email-management-service/internal/auth"
 	"github.com/bariskode/email-management-service/internal/observability"
+	"github.com/bariskode/email-management-service/web"
 )
 
 // NewRouter constructs the HTTP handler with all middlewares and routing table.
@@ -19,6 +20,16 @@ func NewRouter(server *Server, apiKey string, rateLimit int, logger *slog.Logger
 	mux.HandleFunc("GET /healthz", observability.HealthzHandler)
 	mux.HandleFunc("GET /readyz", observability.ReadyzHandler)
 	mux.HandleFunc("GET /metrics", observability.MetricsHandler)
+
+	// Web Dashboard UI (Embedded Single-Page Application)
+	indexHTML, _ := web.AssetsFS.ReadFile("index.html")
+	serveDashboard := func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write(indexHTML)
+	}
+	mux.HandleFunc("GET /{$}", serveDashboard)
+	mux.HandleFunc("GET /dashboard", serveDashboard)
 
 	// API v1 sub-mux protected by Auth & Idempotency
 	apiMux := http.NewServeMux()
