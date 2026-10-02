@@ -208,6 +208,20 @@ func TestCanAccessEndpoint(t *testing.T) {
 	}
 }
 
+func fromNilContext() (Role, bool) {
+	//lint:ignore SA1012 testing nil context resilience
+	//nolint:staticcheck // testing nil context resilience
+	return FromContext(nil)
+}
+
+func withRawStringKey(ctx context.Context, key string, val any) context.Context {
+	//lint:ignore SA1029 testing raw string key fallback
+	//nolint:staticcheck // testing raw string key fallback
+	return context.WithValue(ctx, key, val)
+}
+
+
+
 func TestContextRoleStorage(t *testing.T) {
 	// Empty context
 	r, ok := FromContext(context.Background())
@@ -219,7 +233,7 @@ func TestContextRoleStorage(t *testing.T) {
 	}
 
 	// Nil context
-	r, ok = FromContext(nil)
+	r, ok = fromNilContext()
 	if ok || r != "" {
 		t.Errorf("expected empty role from nil context")
 	}
@@ -242,26 +256,27 @@ func TestContextRoleStorage(t *testing.T) {
 	}
 
 	// String key "actor_role"
-	ctxStringKey := context.WithValue(context.Background(), "actor_role", "viewer")
+	ctxStringKey := withRawStringKey(context.Background(), "actor_role", "viewer")
 	r, ok = FromContext(ctxStringKey)
 	if !ok || r != RoleViewer {
 		t.Errorf("expected RoleViewer from 'actor_role' string key, got '%s'", r)
 	}
 
 	// String key "role"
-	ctxRoleKey := context.WithValue(context.Background(), "role", "operator")
+	ctxRoleKey := withRawStringKey(context.Background(), "role", "operator")
 	r, ok = FromContext(ctxRoleKey)
 	if !ok || r != RoleOperator {
 		t.Errorf("expected RoleOperator from 'role' string key, got '%s'", r)
 	}
 
 	// API key actor_type fallback
-	ctxAPIKey := context.WithValue(context.Background(), "actor_type", "api_key")
+	ctxAPIKey := withRawStringKey(context.Background(), "actor_type", "api_key")
 	r, ok = FromContext(ctxAPIKey)
 	if !ok || r != RoleAdmin {
 		t.Errorf("expected RoleAdmin from api_key actor_type, got '%s'", r)
 	}
 }
+
 
 func TestRequireRoleMiddleware(t *testing.T) {
 	tests := []struct {
@@ -300,8 +315,9 @@ func TestRequireRoleMiddleware(t *testing.T) {
 			minRole:   RoleViewer,
 			actorRole: "",
 			contextMod: func(ctx context.Context) context.Context {
-				return context.WithValue(ctx, "actor_type", "api_key")
+				return withRawStringKey(ctx, "actor_type", "api_key")
 			},
+
 			expectStatus: http.StatusOK,
 		},
 
