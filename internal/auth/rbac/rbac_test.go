@@ -220,8 +220,6 @@ func withRawStringKey(ctx context.Context, key string, val any) context.Context 
 	return context.WithValue(ctx, key, val)
 }
 
-
-
 func TestContextRoleStorage(t *testing.T) {
 	// Empty context
 	r, ok := FromContext(context.Background())
@@ -276,7 +274,6 @@ func TestContextRoleStorage(t *testing.T) {
 		t.Errorf("expected RoleAdmin from api_key actor_type, got '%s'", r)
 	}
 }
-
 
 func TestRequireRoleMiddleware(t *testing.T) {
 	tests := []struct {
