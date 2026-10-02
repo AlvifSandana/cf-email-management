@@ -17,11 +17,11 @@ import (
 
 // Server coordinates HTTP endpoints.
 type Server struct {
-	repos       *storage.Repositories
-	destService *destination.Service
+	repos        *storage.Repositories
+	destService  *destination.Service
 	routeService *routing.Service
-	syncEngine  *emsSync.Engine
-	masterKey   []byte
+	syncEngine   *emsSync.Engine
+	masterKey    []byte
 }
 
 // NewServer creates a new HTTP server handler instance.

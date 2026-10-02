@@ -72,12 +72,12 @@ type IdempotencyRepository interface {
 
 // Repositories aggregates all repository interfaces.
 type Repositories struct {
-	Accounts      AccountRepository
-	Zones         ZoneRepository
-	Destinations  DestinationRepository
-	Rules         RoutingRuleRepository
-	CatchAll      CatchAllRepository
-	SyncRuns      SyncRunRepository
-	Audit         AuditRepository
-	Idempotency   IdempotencyRepository
+	Accounts     AccountRepository
+	Zones        ZoneRepository
+	Destinations DestinationRepository
+	Rules        RoutingRuleRepository
+	CatchAll     CatchAllRepository
+	SyncRuns     SyncRunRepository
+	Audit        AuditRepository
+	Idempotency  IdempotencyRepository
 }

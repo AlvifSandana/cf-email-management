@@ -468,9 +468,9 @@ func handleCatchAll(client *http.Client, cfg Config, args []string) {
 			enabled = false
 		}
 		payload := map[string]any{
-			"action_type":  args[2],
-			"destination":  args[3],
-			"enabled":      enabled,
+			"action_type": args[2],
+			"destination": args[3],
+			"enabled":     enabled,
 		}
 		resp, err := doReq(client, cfg, "PUT", "/api/v1/zones/"+args[1]+"/catch-all", payload)
 		if err != nil {

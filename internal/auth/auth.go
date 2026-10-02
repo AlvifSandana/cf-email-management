@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/bariskode/email-management-service/internal/auth/rbac"
 	"github.com/bariskode/email-management-service/internal/domain"
 )
 
@@ -37,6 +38,8 @@ func Middleware(expectedAPIKey string) func(http.Handler) http.Handler {
 			// Add actor details to context
 			ctx := context.WithValue(r.Context(), ActorTypeKey, "api_key")
 			ctx = context.WithValue(ctx, ActorIDKey, "admin")
+			ctx = context.WithValue(ctx, ActorRoleKey, string(rbac.RoleAdmin))
+			ctx = rbac.WithRole(ctx, rbac.RoleAdmin)
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}

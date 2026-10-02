@@ -14,6 +14,7 @@ const (
 	ErrCodeProviderError          = "PROVIDER_ERROR"
 	ErrCodeProviderTimeout        = "PROVIDER_TIMEOUT"
 	ErrCodeUnauthorized           = "UNAUTHORIZED"
+	ErrCodeForbidden              = "FORBIDDEN"
 	ErrCodeConflict               = "CONFLICT"
 	ErrCodeInternal               = "INTERNAL_ERROR"
 )
@@ -85,6 +86,14 @@ func NewUnauthorizedError(msg string) *AppError {
 		Code:       ErrCodeUnauthorized,
 		Message:    msg,
 		HTTPStatus: 401,
+	}
+}
+
+func NewForbiddenError(msg string) *AppError {
+	return &AppError{
+		Code:       ErrCodeForbidden,
+		Message:    msg,
+		HTTPStatus: 403,
 	}
 }
 

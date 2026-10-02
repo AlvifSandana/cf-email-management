@@ -26,15 +26,15 @@ func NewService(repo storage.AuditRepository) *Service {
 
 // RecordParams contains values for an audit log entry.
 type RecordParams struct {
-	Operation            string
-	ResourceType         string
-	ResourceID           string
-	RequestID            string
-	Before               any
-	After                any
-	ProviderResponse     any
-	Status               string
-	ErrorCode            string
+	Operation        string
+	ResourceType     string
+	ResourceID       string
+	RequestID        string
+	Before           any
+	After            any
+	ProviderResponse any
+	Status           string
+	ErrorCode        string
 }
 
 // Record captures and persists a sanitized audit event.
