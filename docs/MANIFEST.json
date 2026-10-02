@@ -1,0 +1,21 @@
+{
+  "project": "Email Management Service",
+  "version": "0.1.0",
+  "date": "2026-10-02",
+  "files": [
+    "PRD.md",
+    "SPECS.md",
+    "DESIGN.md",
+    "PLAN.md",
+    "MEMORY.md",
+    "PROGRESS.md",
+    "README.md"
+  ],
+  "source_basis": [
+    "Cloudflare Email Routing API",
+    "Cloudflare Email Routing Rules API",
+    "Cloudflare Catch-All API",
+    "Cloudflare Destination Addresses API",
+    "Cloudflare Email Sending API"
+  ]
+}

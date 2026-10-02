@@ -1,0 +1,47 @@
+services:
+  ems:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ems-service
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      - EMS_ENV=production
+      - EMS_HTTP_ADDR=:8080
+      - EMS_DATABASE_URL=postgres://ems:ems_secret@postgres:5432/ems?sslmode=disable
+      - EMS_MASTER_KEY=0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+      - EMS_API_KEY=ems_test_admin_key_123
+      - EMS_LOG_LEVEL=info
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/healthz"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: ems-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ems
+      POSTGRES_PASSWORD: ems_secret
+      POSTGRES_DB: ems
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./migrations/000001_init_schema.up.sql:/docker-entrypoint-initdb.d/01_schema.sql
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ems -d ems"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  pgdata:

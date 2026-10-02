@@ -1,0 +1,558 @@
+openapi: 3.1.0
+info:
+  title: Email Management Service (EMS) API
+  version: 0.1.0
+  description: Centralized control plane for managing Cloudflare Email Routing across multiple domains.
+servers:
+  - url: http://localhost:8080
+    description: Local development server
+
+paths:
+  /healthz:
+    get:
+      summary: Liveness probe
+      responses:
+        '200':
+          description: Service is alive
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+
+  /readyz:
+    get:
+      summary: Readiness probe
+      responses:
+        '200':
+          description: Service is ready to accept traffic
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ready
+
+  /metrics:
+    get:
+      summary: Prometheus metrics endpoint
+      responses:
+        '200':
+          description: Metrics in text format
+          content:
+            text/plain:
+              schema:
+                type: string
+
+  /api/v1/accounts:
+    get:
+      summary: List configured Cloudflare accounts
+      security:
+        - ApiKeyAuth: []
+      responses:
+        '200':
+          description: List of accounts
+    post:
+      summary: Register a new Cloudflare account
+      security:
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, cloudflare_account_id, api_token]
+              properties:
+                name:
+                  type: string
+                cloudflare_account_id:
+                  type: string
+                api_token:
+                  type: string
+      responses:
+        '201':
+          description: Account created
+
+  /api/v1/accounts/{id}:
+    get:
+      summary: Get account details
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Account details
+    put:
+      summary: Update account configuration
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                cloudflare_account_id:
+                  type: string
+                api_token:
+                  type: string
+      responses:
+        '200':
+          description: Account updated
+    delete:
+      summary: Remove account configuration
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Account removed
+
+  /api/v1/destinations:
+    get:
+      summary: List destination addresses
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - name: account_id
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of destination addresses
+    post:
+      summary: Create and register a destination address
+      security:
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [account_id, email]
+              properties:
+                account_id:
+                  type: string
+                email:
+                  type: string
+                  format: email
+      responses:
+        '201':
+          description: Destination address registered
+
+  /api/v1/destinations/{id}:
+    get:
+      summary: Get destination address details
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Destination address details
+    patch:
+      summary: Update destination address
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email:
+                  type: string
+                  format: email
+      responses:
+        '200':
+          description: Destination address updated
+    delete:
+      summary: Delete destination address
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Destination address deleted
+
+  /api/v1/zones:
+    get:
+      summary: List imported zones
+      security:
+        - ApiKeyAuth: []
+      responses:
+        '200':
+          description: List of zones
+
+  /api/v1/zones/remote:
+    get:
+      summary: Discover available zones directly from Cloudflare
+      security:
+        - ApiKeyAuth: []
+      responses:
+        '200':
+          description: List of remote zones discovered
+
+  /api/v1/zones/import:
+    post:
+      summary: Import a zone from Cloudflare into EMS
+      security:
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [account_id, provider_zone_id]
+              properties:
+                account_id:
+                  type: string
+                provider_zone_id:
+                  type: string
+      responses:
+        '201':
+          description: Zone imported
+
+  /api/v1/zones/{id}:
+    get:
+      summary: Get zone details
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Zone details
+
+  /api/v1/zones/{id}/routing:
+    get:
+      summary: Get zone email routing settings
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Routing settings
+    patch:
+      summary: Enable or disable email routing for a zone
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [enabled]
+              properties:
+                enabled:
+                  type: boolean
+      responses:
+        '200':
+          description: Settings updated
+
+  /api/v1/zones/{id}/rules:
+    get:
+      summary: List explicit routing rules for a zone
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of rules
+    post:
+      summary: Create an explicit routing rule
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, matcher_value]
+              properties:
+                name:
+                  type: string
+                matcher_type:
+                  type: string
+                  default: literal
+                matcher_field:
+                  type: string
+                  default: to
+                matcher_value:
+                  type: string
+                  example: support@bariskode.com
+                action_type:
+                  type: string
+                  enum: [forward, drop, worker]
+                  default: forward
+                destination:
+                  type: string
+                  example: ops@gmail.com
+                enabled:
+                  type: boolean
+                  default: true
+      responses:
+        '201':
+          description: Rule created
+
+  /api/v1/zones/{id}/rules/{ruleID}:
+    get:
+      summary: Get an explicit routing rule
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: ruleID
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Rule details
+    put:
+      summary: Update an explicit routing rule
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: ruleID
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, matcher_value]
+              properties:
+                name:
+                  type: string
+                matcher_type:
+                  type: string
+                matcher_field:
+                  type: string
+                matcher_value:
+                  type: string
+                action_type:
+                  type: string
+                  enum: [forward, drop, worker]
+                destination:
+                  type: string
+                enabled:
+                  type: boolean
+      responses:
+        '200':
+          description: Rule updated
+    delete:
+      summary: Delete an explicit routing rule
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: ruleID
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Rule deleted
+
+  /api/v1/zones/{id}/catch-all:
+    get:
+      summary: Get catch-all routing configuration for a zone
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Catch-all rule configuration
+    put:
+      summary: Configure catch-all routing rule for a zone
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [enabled, action_type]
+              properties:
+                enabled:
+                  type: boolean
+                action_type:
+                  type: string
+                  enum: [forward, drop, worker]
+                  default: forward
+                destination:
+                  type: string
+                  example: inbox@gmail.com
+      responses:
+        '200':
+          description: Catch-all rule updated
+
+  /api/v1/zones/{id}/sync:
+    post:
+      summary: Trigger synchronization or drift detection for a zone
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                direction:
+                  type: string
+                  enum: [drift_check, pull, push]
+                  default: drift_check
+      responses:
+        '200':
+          description: Sync run result and diff items
+
+  /api/v1/audit-events:
+    get:
+      summary: Query recent audit events
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 100
+      responses:
+        '200':
+          description: List of audit events
+
+  /api/v1/sync-runs:
+    get:
+      summary: Query synchronization run history
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 100
+      responses:
+        '200':
+          description: List of sync runs
+
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      description: API Key authentication
