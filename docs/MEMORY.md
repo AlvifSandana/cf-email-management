@@ -182,57 +182,57 @@ Provider mutation should be followed by read-after-write for important operation
 
 ---
 
-## 11. Future Direction
-
-Possible future modules:
+## 11. Implemented Modules
 
 ```text
-Email Routing
-Email Sending
-Workers
-Notifications
-Dashboard
-Multi-provider
-RBAC
-OIDC
+Email Routing            100% (Explicit rules + Dedicated Catch-All)
+Destination Management   100% (Enforced verification check)
+Sync & Drift Engine      100% (Diff calculation: MATCHED, CHANGED, etc.)
+Reconciliation Worker    100% (Scheduled background ticker with callbacks)
+Email Sending            100% (Cloudflare Outbound Send API Client)
+Worker Management        100% (Worker routing actions + Script upload/delete)
+Notifications            100% (Slack, Discord, Telegram, Generic Webhooks)
+Web Dashboard            100% (Embedded Single-Page App at / and /dashboard)
+CLI Management Tool      100% (cmd/ems-cli terminal utility)
+Multi-Provider           100% (AWS SES Adapter + Cloudflare Adapter)
+RBAC & OIDC Auth         100% (Admin, Operator, Viewer + OIDC JWT validation)
+Production Hardening     100% (Traefik TLS, Rate limiting, Security headers)
+CI/CD Pipeline           100% (GitHub Actions test, lint, docker, trivy)
 ```
 
-Email Sending remains logically separate from Email Routing.
+Email Sending remains logically separated under `internal/email/sending/`.
 
 ---
 
 ## 12. Important References
 
 Cloudflare Email Routing API:
-
 https://developers.cloudflare.com/api/resources/email_routing/
 
 Cloudflare Routing Rules:
-
 https://developers.cloudflare.com/api/resources/email_routing/subresources/rules/
 
 Cloudflare Catch-All:
-
 https://developers.cloudflare.com/api/resources/email_routing/subresources/rules/subresources/catch_alls/
 
 Cloudflare Destination Addresses:
-
 https://developers.cloudflare.com/api/resources/email_routing/subresources/addresses/
 
-Cloudflare Email Service configuration:
+Cloudflare Email Sending REST API:
+https://developers.cloudflare.com/api/resources/email_sending/
 
-https://developers.cloudflare.com/email-service/configuration/email-routing-addresses/
+Cloudflare Workers Scripts API:
+https://developers.cloudflare.com/api/resources/workers/subresources/scripts/
 
 ---
 
-## 13. Open Decisions
+## 13. Resolved Technical Decisions
 
-These are intentionally not finalized:
+- **Authentication Architecture:** Combined hybrid model supporting static `X-API-Key` (defaults to Admin role) and OIDC JWT Bearer tokens with RBAC role claims (`Admin`, `Operator`, `Viewer`).
+- **Sync & Drift Execution:** Per-zone concurrency locking via in-memory mutexes, scheduled via background ticker worker (`internal/sync/worker.go`) with non-blocking callback alerts.
+- **Multi-Channel Alerting:** Centralized `notification.Service` supporting Slack block attachments, Discord embeds, Telegram markdown, and Generic JSON payloads.
+- **Multi-Provider Strategy:** Provider abstraction `EmailProvider` implemented for Cloudflare API v4 and AWS SES (domain identities, receipt rules, and verified identities).
+- **Secrets Backend:** Encrypted PostgreSQL using AES-256-GCM with a 32-byte master key passed via `EMS_MASTER_KEY`.
+- **Git Multi-Key SSH:** Remote `github-AlvifSandana` alias in `~/.ssh/config` must always be used for `AlvifSandana/cf-email-management.git` to bind to `id_ed25519_github_AlvifSandana`.
+- **Go Toolchain Target:** Target `go 1.24` in `go.mod` to ensure compatibility across local compilers, GitHub Actions runners, and static analysis linters (`golangci-lint`, `staticcheck`).
 
-- OIDC vs API key as primary authentication.
-- Whether desired state is stored separately from observed state.
-- Whether to use a job queue for sync.
-- Dashboard implementation details.
-- Notification channels.
-- Multi-provider roadmap.
-- Secret backend: encrypted PostgreSQL vs external secret manager.

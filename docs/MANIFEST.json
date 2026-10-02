@@ -8,6 +8,7 @@
     "DESIGN.md",
     "PLAN.md",
     "MEMORY.md",
+    "PRODUCTION.md",
     "PROGRESS.md",
     "README.md"
   ],
@@ -16,6 +17,10 @@
     "Cloudflare Email Routing Rules API",
     "Cloudflare Catch-All API",
     "Cloudflare Destination Addresses API",
-    "Cloudflare Email Sending API"
+    "Cloudflare Email Sending API",
+    "Cloudflare Workers Scripts API",
+    "AWS SES API (Domain Identities, Receipt Rules, Verified Addresses)",
+    "Slack, Discord, and Telegram Webhook APIs"
   ]
 }
+

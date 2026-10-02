@@ -571,3 +571,169 @@ Official documentation:
   https://developers.cloudflare.com/api/resources/email_routing/subresources/addresses/
 - Email Routing configuration:
   https://developers.cloudflare.com/email-service/configuration/email-routing-addresses/
+- Email Sending REST API:
+  https://developers.cloudflare.com/api/resources/email_sending/
+- Workers Scripts API:
+  https://developers.cloudflare.com/api/resources/workers/subresources/scripts/
+
+---
+
+## 16. Outbound Email Sending Specification
+
+Package: `internal/email/sending`
+
+Endpoint:
+```http
+POST https://api.cloudflare.com/client/v4/accounts/{account_id}/email/sending/send
+```
+
+Request DTO:
+```json
+{
+  "from": "sender@domain.com",
+  "to": ["recipient@domain.com"],
+  "subject": "Email Subject",
+  "text": "Plain text body",
+  "html": "<p>HTML body</p>",
+  "headers": {
+    "X-Custom-Header": "value"
+  }
+}
+```
+
+Response DTO:
+```json
+{
+  "message_id": "cf_msg_12345",
+  "status": "sent",
+  "errors": []
+}
+```
+
+Error Mapping:
+- HTTP 400 / 10001, 10200-10202 &rarr; `domain.ErrCodeValidationFailed`
+- HTTP 401/403 / 10101-10105 &rarr; `domain.ErrCodeUnauthorized`
+- HTTP 404 / 10000 &rarr; `domain.ErrCodeNotFound`
+- Destination unverified &rarr; `domain.ErrCodeDestinationNotVerified`
+- HTTP 504 / timeout &rarr; `domain.ErrCodeProviderTimeout`
+- HTTP 500/502/503 &rarr; `domain.ErrCodeProviderError`
+
+---
+
+## 17. Multi-User RBAC & OIDC Authentication Specification
+
+Packages: `internal/auth/rbac`, `internal/auth/`
+
+### Role Hierarchy & Permissions
+- **Admin** (Level 3): Full system access (accounts, secrets, rules, destinations, sync, workers).
+- **Operator** (Level 2): Rules, catch-all, destinations, sync, and workers modification. Cannot modify accounts or master secrets.
+- **Viewer** (Level 1): Read-only access (`GET`, `HEAD`, `OPTIONS`) across resources.
+
+### Middleware Enforcement
+```go
+rbac.RequireRole(rbac.RoleOperator)
+rbac.RequirePermission(rbac.PermRulesModify)
+```
+On unauthorized access: Returns HTTP 403 Forbidden:
+```json
+{
+  "error": {
+    "code": "FORBIDDEN",
+    "message": "Insufficient permissions"
+  }
+}
+```
+
+### OIDC Integration
+- Parses `Authorization: Bearer <jwt>`
+- Decodes claims: subject (`sub`), email (`email`), roles (`roles`, `realm_access.roles`)
+- Validates signature (HMAC-SHA256) and expiration timestamp.
+- Stores actor identity and role in request context.
+
+---
+
+## 18. Notification & Webhook Alerting Service Specification
+
+Package: `internal/notification`
+
+Configuration:
+- `WebhookURL`: Target endpoint URL
+- `WebhookType`: `slack`, `discord`, `telegram`, or `generic` (default: generic)
+- `TelegramChatID`: Chat identifier for Telegram bots
+- `Timeout`: HTTP timeout (default 10s)
+
+Events:
+1. **Drift Detected**: Dispatched when synchronization detects `CHANGED`, `REMOTE_ONLY`, or `LOCAL_ONLY` rules.
+2. **Destination Verified**: Dispatched when a destination address confirmation is detected.
+
+Payload Formats:
+- **Slack**: Structured block kit with colored attachments.
+- **Discord**: Embed payload with categorized fields for Changed, Remote, and Local rules.
+- **Telegram**: Markdown-formatted message with chat_id.
+- **Generic**: Standard JSON envelope with event type, timestamp, zone name, and diffs array.
+
+---
+
+## 19. Scheduled Background Reconciliation Worker Specification
+
+Package: `internal/sync`
+
+Worker Configuration:
+```go
+worker := sync.NewWorker(repos, syncEngine, interval, logger, onDriftFunc)
+worker.Start(ctx)
+```
+
+Execution Behavior:
+1. Runs initial drift detection pass immediately upon startup.
+2. Ticks at configured interval (e.g. 5 minutes).
+3. Queries active zones from repository.
+4. Calls `SyncEngine.SyncZone(ctx, zone.ID, "drift_check", requestID)`.
+5. If drift exists (`status != "MATCHED"`), triggers `onDriftFunc(zone, result)` callback.
+6. Handles graceful cancellation via `ctx.Done()`.
+
+---
+
+## 20. Cloudflare Worker Script Deployment Specification
+
+Package: `internal/provider/cloudflare`
+
+API Methods:
+```go
+ListWorkers(ctx context.Context, accountID string) ([]WorkerSummary, error)
+UploadWorker(ctx context.Context, accountID, scriptName, scriptContent string) error
+DeleteWorker(ctx context.Context, accountID, scriptName string) error
+```
+
+Endpoints:
+- `GET /accounts/{account_id}/workers/scripts`
+- `PUT /accounts/{account_id}/workers/scripts/{script_name}` (`application/javascript`)
+- `DELETE /accounts/{account_id}/workers/scripts/{script_name}`
+
+---
+
+## 21. Multi-Provider AWS SES Adapter Specification
+
+Package: `internal/provider/ses`
+
+Implements interface `provider.EmailProvider`:
+- `ListZones`: Maps AWS SES domain identities (`ses:ListIdentities`, `IdentityType: Domain`).
+- `GetEmailRoutingSettings` / `UpdateEmailRoutingSettings`: Maps active receipt rule set state (`ses:DescribeActiveReceiptRuleSet`).
+- `ListDestinationAddresses` / `CreateDestinationAddress` / `DeleteDestinationAddress`: Maps SES verified email addresses (`IdentityType: EmailAddress`).
+- `ListRules` / `CreateRule` / `UpdateRule` / `DeleteRule`: Maps SES receipt rules with recipient conditions and forwarding/drop actions.
+- `GetCatchAll` / `UpdateCatchAll`: Maps catch-all receipt rule at end of rule set.
+
+---
+
+## 22. Web Dashboard & CLI Tool Specification
+
+### Web Dashboard
+- Single-page application embedded in binary via Go `embed` (`web/index.html`).
+- Served at `GET /` and `GET /dashboard`.
+- Communicates directly with `/api/v1` REST endpoints using session/API key.
+
+### CLI Utility (`cmd/ems-cli`)
+- Subcommands: `accounts`, `zones`, `destinations`, `rules`, `catch-all`, `sync`.
+- Supports `--api-key` and `--url` flags or environment variables `EMS_API_KEY` and `EMS_API_URL`.
+- Outputs human-readable tables or formatted JSON.
+

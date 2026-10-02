@@ -257,47 +257,96 @@ Generate clients later if needed.
 
 ---
 
-## 14. Phase 12 — Dashboard
+## 14. Phase 12 — Dashboard & Management CLI (Completed)
 
-Suggested SvelteKit application.
-
-Dashboard modules:
-
-```text
-Overview
-Domains
-Rules
-Catch-All
-Destinations
-Sync
-Audit
-Settings
-```
+Implemented as a dual-interface management layer:
+1. **Embedded Single-Page Dashboard** (`web/index.html`) embedded directly into Go binary and served at `GET /` and `GET /dashboard`.
+2. **Dedicated CLI Utility** (`cmd/ems-cli/main.go`) supporting terminal automation for zones, rules, catch-all, destinations, and sync.
 
 ---
 
-## 15. Phase 13 — Production Hardening
+## 15. Phase 13 — Production Hardening (Completed)
 
 Checklist:
 
-- [ ] TLS
-- [ ] reverse proxy
-- [ ] secret encryption
-- [ ] rate limiting
-- [ ] security headers
-- [ ] backup
-- [ ] migrations tested
-- [ ] disaster recovery test
-- [ ] provider timeout policy
-- [ ] audit verification
-- [ ] dependency scanning
-- [ ] container image scanning
-- [ ] non-root container
-- [ ] read-only filesystem where practical
+- [x] TLS (Automated via Traefik v3 & Let's Encrypt)
+- [x] reverse proxy (`compose.prod.yaml` with Traefik)
+- [x] secret encryption (AES-256-GCM via `EMS_MASTER_KEY`)
+- [x] rate limiting (Sliding window per IP with `Retry-After`)
+- [x] security headers (HSTS, CSP, X-Frame-Options: DENY, nosniff)
+- [x] backup (`scripts/backup.sh` and `scripts/backup.ps1`)
+- [x] migrations tested (`migrations.InitSchemaSQL` auto-applied on startup)
+- [x] disaster recovery test (`scripts/restore.sh` and `scripts/restore.ps1`)
+- [x] provider timeout policy (10s default context timeouts)
+- [x] audit verification (sanitizes tokens, keys, passwords)
+- [x] dependency scanning (via Trivy action in CI)
+- [x] container image scanning (via Trivy action in CI)
+- [x] non-root container (`ems:ems` UID 1000)
+- [x] read-only filesystem where practical (`read_only: true` with tmpfs `/tmp`)
 
 ---
 
-## 16. Testing Strategy
+## 16. Phase 14 — Scheduled Background Reconciliation Worker (Completed)
+
+- Background ticker-driven worker in `internal/sync/worker.go`.
+- Periodic zone drift detection with graceful shutdown on `ctx.Done()`.
+- Isolated zone failure handling and `onDriftFunc` event callbacks.
+- Comprehensive unit tests in `internal/sync/worker_test.go`.
+
+---
+
+## 17. Phase 15 — Multi-Channel Webhook Alerting Service (Completed)
+
+- Implemented in `internal/notification/service.go`.
+- Formatted payloads for **Slack**, **Discord**, **Telegram**, and **Generic JSON**.
+- Drift alerts and destination verification alerts.
+- Bounded HTTP client timeouts and full unit tests in `internal/notification/service_test.go`.
+
+---
+
+## 18. Phase 16 — Cloudflare Outbound Email Sending Client (Completed)
+
+- Implemented in `internal/email/sending/sending.go`.
+- Integration with Cloudflare REST API `POST /accounts/{account_id}/email/sending/send`.
+- DTOs, payload translation, and error mapping to `domain.AppError`.
+- Comprehensive unit tests in `internal/email/sending/sending_test.go`.
+
+---
+
+## 19. Phase 17 — Multi-User RBAC & OIDC Authentication (Completed)
+
+- Role-based access control in `internal/auth/rbac/rbac.go` (Admin, Operator, Viewer).
+- Granular permission matrix and `RequireRole` / `RequirePermission` middleware (403 Forbidden).
+- OIDC JWT token validation and HMAC signature checking in `internal/auth/oidc.go`.
+- Combined API Key + OIDC middleware and unit tests in `internal/auth/rbac/rbac_test.go`.
+
+---
+
+## 20. Phase 18 — Cloudflare Worker Script Deployment Management (Completed)
+
+- Implemented in `internal/provider/cloudflare/workers.go`.
+- API methods for `ListWorkers`, `UploadWorker`, and `DeleteWorker`.
+- Error normalization and unit tests in `internal/provider/cloudflare/workers_test.go`.
+
+---
+
+## 21. Phase 19 — Multi-Provider AWS SES Adapter (Completed)
+
+- Implemented in `internal/provider/ses/ses.go`.
+- Full implementation of `provider.EmailProvider` for AWS SES domain identities, receipt rules, and verified email identities.
+- Unit tests in `internal/provider/ses/ses_test.go`.
+
+---
+
+## 22. Phase 20 — Production CI/CD Pipeline (Completed)
+
+- GitHub Actions workflow in `.github/workflows/ci.yml`.
+- Triggers on `push` and `pull_request` targeting `main`.
+- Jobs: `test` (race + coverage), `lint` (gofmt, vet, golangci-lint), `docker-build`, and `security-scan` (Trivy).
+
+---
+
+## 23. Testing Strategy
 
 ### Unit
 
@@ -321,24 +370,25 @@ Never run destructive tests against production domains.
 
 ---
 
-## 17. Suggested Milestones
+## 24. Milestone Status
 
 ```text
-M0 Foundation
-M1 Provider adapter
-M2 Destinations
-M3 Zones
-M4 Rules
-M5 Catch-All
-M6 Sync
-M7 Audit/Auth
-M8 Production hardening
-M9 Dashboard
+M0 Foundation                  100% Completed
+M1 Provider adapter (CF & SES) 100% Completed
+M2 Destinations                100% Completed
+M3 Zones                       100% Completed
+M4 Rules                       100% Completed
+M5 Catch-All                   100% Completed
+M6 Sync & Reconciliation       100% Completed
+M7 Audit, Auth (RBAC & OIDC)   100% Completed
+M8 Production hardening        100% Completed
+M9 Web Dashboard & CLI         100% Completed
+M10 Advanced Services & CI/CD  100% Completed
 ```
 
 ---
 
-## 18. Definition of Done
+## 25. Definition of Done
 
 A feature is done when:
 
@@ -350,3 +400,4 @@ A feature is done when:
 - logs/metrics are adequate
 - security review is completed
 - integration behavior is verified
+

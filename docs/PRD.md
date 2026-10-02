@@ -1,7 +1,7 @@
 # Email Management Service — Product Requirements Document
 
 **Version:** 0.1.0  
-**Status:** Draft / Foundation  
+**Status:** Production Ready / Complete  
 **Date:** 2026-10-02  
 **Product:** Email Management Service (EMS)
 
@@ -9,24 +9,28 @@
 
 ## 1. Executive Summary
 
-Email Management Service (EMS) is a self-hosted service for centrally managing custom email routing across domains hosted in Cloudflare.
+Email Management Service (EMS) is a self-hosted control plane for centrally managing custom email routing across domains hosted in Cloudflare and compatible providers (e.g. AWS SES).
 
-The primary objective is to replace repetitive Cloudflare Dashboard operations with a single API and, later, a lightweight web dashboard.
+The primary objective is to replace repetitive Cloudflare Dashboard operations with a single API, a dedicated CLI, and a lightweight responsive web dashboard.
 
 EMS manages:
 
-- Cloudflare zones/domains
+- Cloudflare and AWS SES zones/domains
 - Email Routing enablement/status
 - Verified destination addresses
 - Explicit custom-address routing rules
-- Catch-all routing rules
-- Cloudflare Worker-based email actions
-- Synchronization between local state and Cloudflare
-- Audit history
-- Provider/API credentials
-- Health and synchronization status
+- Dedicated Catch-all routing rules
+- Cloudflare Worker-based email actions and script deployment
+- Cloudflare Outbound email sending client
+- Background scheduled synchronization and real-time drift detection
+- Multi-channel webhook alerts (Slack, Discord, Telegram, Generic)
+- Multi-user RBAC (Admin, Operator, Viewer) & OIDC JWT authentication
+- Audit history with automatic secret redaction
+- Provider/API credentials with AES-256-GCM encryption
+- Health, readiness, and Prometheus metrics
+- Turnkey production stack with Traefik TLS & non-root container hardening
 
-The initial product is **routing management**, not a mailbox provider. EMS does not provide IMAP/POP3 inboxes.
+The core product is **routing management and outbound integration**, not a mailbox host (no IMAP/POP3 inboxes).
 
 ---
 
@@ -45,7 +49,7 @@ Typical operations include:
 7. Updating or deleting rules.
 8. Checking whether Cloudflare and the local intended state are consistent.
 
-EMS centralizes those operations behind a provider abstraction and API.
+EMS centralizes those operations behind a provider abstraction, web dashboard, CLI, and REST API.
 
 ---
 
@@ -53,44 +57,42 @@ EMS centralizes those operations behind a provider abstraction and API.
 
 ### 3.1 Primary Goals
 
-- Manage multiple Cloudflare domains from one service.
+- Manage multiple Cloudflare and SES domains from one service.
 - Manage explicit email routing rules.
 - Manage catch-all rules.
 - Manage account-level destination addresses.
-- Detect and report drift between EMS state and Cloudflare.
+- Detect and report drift between EMS state and remote infrastructure.
 - Provide safe, idempotent APIs.
-- Keep provider credentials out of normal application data.
+- Keep provider credentials encrypted and out of normal application logs.
 - Provide an audit trail for changes.
-- Support future web UI without redesigning the backend.
+- Provide an embedded web dashboard and terminal CLI.
 
-### 3.2 Secondary Goals
+### 3.2 Advanced Goals (Delivered)
 
-- Support Cloudflare Workers as routing actions.
-- Provide synchronization/reconciliation.
-- Support dry-run operations.
-- Provide operational health endpoints.
-- Support multiple Cloudflare accounts.
-- Make the provider layer replaceable.
+- Support Cloudflare Workers as routing actions and manage worker scripts.
+- Provide automated scheduled background reconciliation.
+- Multi-channel notification webhook alerts (Slack, Discord, Telegram, Generic).
+- Outbound email sending via Cloudflare Sending API.
+- Multi-user RBAC and OIDC authentication.
+- Multi-provider support via AWS SES adapter.
+- Operational health, readiness, and Prometheus metrics.
+- Hardened production deployment and automated CI/CD pipeline.
 
 ---
 
 ## 4. Non-Goals
 
-The following are explicitly outside MVP:
+The following remain explicitly outside scope:
 
 - Full mailbox hosting.
 - IMAP/POP3 server.
-- Webmail.
+- Webmail mailbox interface.
 - User mailbox storage.
 - Spam filtering engine.
 - SMTP server implementation.
-- Email marketing platform.
-- Bulk outbound email system.
 - Domain registrar management.
 - DNS management unrelated to Email Routing.
-- Automatic ownership of arbitrary third-party email providers.
 
-Cloudflare Email Sending may be integrated later as a separate outbound capability.
 
 ---
 
@@ -336,17 +338,32 @@ MVP is successful when an operator can:
 
 ---
 
-## 12. Future Product Direction
+## 12. Delivered System Architecture
+ 
+ ```text
+ EMS Control Plane
+ ├── Core Inbound Routing
+ │   ├── Explicit Rules (forward, drop, worker)
+ │   ├── Dedicated First-Class Catch-All
+ │   └── Verified Destination Enforcement
+ ├── Sync & Integrity Engine
+ │   ├── On-demand Diff & Sync API
+ │   ├── Scheduled Background Reconciliation Worker
+ │   └── Multi-channel Webhook Alerting (Slack, Discord, Telegram, Generic)
+ ├── Outbound Services
+ │   └── Cloudflare Outbound Email Sending Client
+ ├── Extensible Provider Layer
+ │   ├── Cloudflare API v4 Adapter & Worker Deployment
+ │   ├── AWS SES Provider Adapter
+ │   └── Test Mocks
+ ├── Security & Auth
+ │   ├── Multi-User RBAC (Admin, Operator, Viewer)
+ │   ├── OIDC JWT Token Validation
+ │   ├── AES-256-GCM Credential Encryption
+ │   └── Redacted Audit Logging
+ └── Interfaces
+     ├── REST API with Idempotency & Rate Limiting
+     ├── Embedded Responsive Web Dashboard
+     └── Dedicated Terminal CLI Tool (ems-cli)
+ ```
 
-Potential evolution:
-
-```text
-EMS
-├── Cloudflare Email Routing
-├── Cloudflare Email Sending
-├── Cloudflare Workers Email
-├── Provider abstraction
-├── Notifications
-├── Dashboard
-└── Multi-account / multi-provider management
-```

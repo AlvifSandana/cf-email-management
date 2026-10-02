@@ -55,12 +55,21 @@ It replaces repetitive manual Cloudflare dashboard workflows with a single, secu
 ## Key Features
 
 - **Multi-Domain & Multi-Account Orchestration**: Centrally manage all your Cloudflare accounts and zones through a single unified control plane.
+- **Embedded Web Dashboard**: Modern responsive UI served natively at `GET /` and `GET /dashboard` for managing rules, destinations, catch-all, and monitoring drift in real-time.
+- **Dedicated CLI Utility (`ems-cli`)**: Intuitive command-line interface for automating accounts, destinations, rules, catch-all, and sync workflows.
 - **Dedicated First-Class Catch-All**: Models catch-all rules natively using Cloudflare's dedicated `/catch_all` endpoints, distinct from generic routing rules.
 - **Verification-Gated Forwarding**: Prevents misconfigurations by verifying that destination addresses are confirmed before routing rules can forward mail to them.
-- **Bi-Directional Sync & Drift Detection**: Detects divergence between local desired state and Cloudflare remote infrastructure (`MATCHED`, `LOCAL_ONLY`, `REMOTE_ONLY`, `CHANGED`).
+- **Bi-Directional Sync & Drift Detection**: Detects divergence between local desired state and remote infrastructure (`MATCHED`, `LOCAL_ONLY`, `REMOTE_ONLY`, `CHANGED`).
+- **Scheduled Background Reconciliation**: Automated background worker (`internal/sync/worker.go`) periodically polling zones for configuration drift with configurable callbacks.
+- **Multi-Channel Webhook Alerting**: Instant notifications via **Slack**, **Discord**, **Telegram**, or generic JSON webhooks on drift detection or destination verification.
+- **Cloudflare Worker Actions & Deployment**: Support for Cloudflare Worker email routing actions, plus automated script inspection, upload, and deletion (`internal/provider/cloudflare/workers.go`).
+- **Cloudflare Outbound Email Sending**: Clean client abstraction for Cloudflare's outbound sending API with error normalization into domain errors (`internal/email/sending`).
+- **Multi-Provider Architecture (AWS SES Adapter)**: Pluggable provider abstraction with full AWS SES adapter (`internal/provider/ses`) for domains, receipt rules, and verified identities.
+- **Multi-User RBAC & OIDC Authentication**: Role-based access control (Admin, Operator, Viewer) with permission enforcement and OIDC JWT bearer token verification (`internal/auth/rbac`, `internal/auth/oidc.go`).
 - **Zero-Trust Secret Security**: Provider API tokens are encrypted at rest using AES-256-GCM with a 32-byte master key. Sensitive tokens and passwords are automatically redacted from audit logs.
 - **Idempotent Mutations**: Supports `Idempotency-Key` headers on mutating requests, preventing duplicate rule creation and unintended side-effects.
 - **Production-Grade Hardening**: Dockerized with a non-root user (`ems:ems`), read-only root container filesystem, Traefik automated TLS, and sliding-window rate limiting.
+- **CI/CD Quality Gate**: Production GitHub Actions pipeline running tests, race detection, formatting checks, linters, container builds, and Trivy security scans.
 - **Observability Native**: Out-of-the-box `/healthz`, `/readyz`, and Prometheus `/metrics` endpoints.
 
 ---
@@ -70,7 +79,7 @@ It replaces repetitive manual Cloudflare dashboard workflows with a single, secu
 > [!NOTE]
 > **EMS is an email routing control plane, not a mailbox host.**
 
-- **Supported:** Forwarding custom aliases (e.g., `support@bariskode.com` &rarr; `team@gmail.com`), catch-all routing (`*@bariskode.com`), and drop actions.
+- **Supported:** Forwarding custom aliases (e.g., `support@bariskode.com` &rarr; `team@gmail.com`), catch-all routing (`*@bariskode.com`), drop actions, and worker scripts.
 - **Out of Scope:** IMAP/POP3 servers, webmail interfaces, and local mailbox storage.
 
 ---
@@ -79,25 +88,34 @@ It replaces repetitive manual Cloudflare dashboard workflows with a single, secu
 
 ```text
 email-management-service/
+├── .github/
+│   └── workflows/ci.yml     # Production CI/CD workflow (test, lint, docker, trivy)
 ├── cmd/
-│   └── ems/                 # Application entry point (bootstrapping & graceful shutdown)
+│   ├── ems/                 # EMS daemon entry point (bootstrapping & graceful shutdown)
+│   └── ems-cli/             # Dedicated CLI tool for terminal operations
 ├── internal/
 │   ├── audit/               # Audit service with automatic secret redaction
-│   ├── auth/                # AES-256-GCM credential encryption & API-key middleware
+│   ├── auth/                # AES-256-GCM encryption, API keys, RBAC & OIDC JWT validation
+│   │   └── rbac/            # Role hierarchy (Admin, Operator, Viewer) & permission middleware
 │   ├── config/              # Environment configuration loader
 │   ├── destination/         # Destination address management & verification checking
 │   ├── domain/              # Core domain models, enums, and normalized errors
+│   ├── email/
+│   │   └── sending/         # Cloudflare outbound email sending client
 │   ├── httpapi/             # REST API handlers, routing, idempotency & security middleware
+│   ├── notification/        # Webhook alerting service (Slack, Discord, Telegram, Generic)
 │   ├── observability/       # Health probes (/healthz, /readyz) & Prometheus metrics
 │   ├── provider/
-│   │   ├── cloudflare/      # Cloudflare API v4 adapter implementation
+│   │   ├── cloudflare/      # Cloudflare API v4 adapter & Worker script deployment
 │   │   ├── mock/            # In-memory mock provider for testing
+│   │   ├── ses/             # Multi-provider AWS SES adapter
 │   │   └── provider.go      # Abstract EmailProvider interface
 │   ├── routing/             # Zone discovery, explicit routing rules & catch-all services
 │   ├── storage/             # Repository interfaces with Postgres & Memory implementations
-│   └── sync/                # Sync engine, diff calculator & per-zone concurrency locks
+│   └── sync/                # Sync engine, diff calculator & background reconciliation worker
 ├── migrations/              # Embedded SQL migrations (auto-applied on startup)
-├── scripts/                 # Automated backup & restore scripts (Linux/macOS & Windows)
+├── scripts/                 # Automated backup & restore runbooks (Bash & PowerShell)
+├── web/                     # Embedded single-page Web Dashboard (HTML5, Tailwind, JS)
 ├── api/
 │   └── openapi.yaml         # OpenAPI 3.1 specification contract
 ├── docs/                    # Complete product and architecture specifications
@@ -107,6 +125,7 @@ email-management-service/
 ├── Makefile                 # Build, test, and automation targets
 └── README.md
 ```
+
 
 ---
 
@@ -303,12 +322,61 @@ curl -X POST http://localhost:8080/api/v1/zones/{zone_id}/sync \
 
 ---
 
+## Web Dashboard & CLI Management Tool
+
+### 1. Web Dashboard (Built-in SPA)
+
+EMS bundles an embedded responsive Single-Page Dashboard (`web/index.html`) directly into the Go binary. No extra build steps or node dependencies are required.
+
+- **URL:** Open `http://localhost:8080/` or `http://localhost:8080/dashboard` in your browser.
+- **Capabilities:**
+  - View configured accounts and zones.
+  - Inspect, create, and modify explicit routing rules.
+  - Enable and update dedicated Catch-All routing.
+  - Verify and register destination forwarding addresses.
+  - Trigger one-click drift detection and view real-time synchronization diffs.
+
+---
+
+### 2. Dedicated CLI Tool (`cmd/ems-cli`)
+
+For terminal-first workflows, CI automation, and scripting:
+
+```bash
+# Build the CLI utility
+go build -o bin/ems-cli ./cmd/ems-cli
+
+# Set environment variables (or pass --api-key and --url flags)
+export EMS_API_URL=http://localhost:8080
+export EMS_API_KEY=ems-admin-secret-key
+
+# List registered zones
+./bin/ems-cli zones list
+
+# Trigger zone drift check
+./bin/ems-cli sync run <zone_id> drift_check
+
+# Pull remote Cloudflare configuration to local DB
+./bin/ems-cli sync run <zone_id> pull
+
+# List routing rules for a zone
+./bin/ems-cli rules list <zone_id>
+
+# Configure dedicated catch-all forwarding
+./bin/ems-cli catch-all set <zone_id> forward team@gmail.com true
+
+# List destination addresses
+./bin/ems-cli destinations list
+```
+
+---
+
 ## Testing & Verification
 
 EMS adheres to strict test-driven reliability. Run the test suite:
 
 ```bash
-# Run all unit and integration tests with race detector
+# Run all unit and integration tests
 make test
 
 # Run Go static analysis
@@ -334,11 +402,20 @@ make build
 ## Development Status
 
 - **Current Version:** `0.1.0`
-- **Milestone:** **M0-M8 Complete (MVP & Production Hardening Ready)**
-- **Next Milestone:** M9 (SvelteKit Web Dashboard)
+- **Status:** **All Roadmap Milestones Complete (M0-M9 & Advanced Roadmap)**
+  - Core MVP & Persistence (M0–M8)
+  - Web Dashboard & Management CLI (M9)
+  - Scheduled Background Reconciliation Worker
+  - Multi-Channel Notification Webhook Alerting (Slack, Discord, Telegram, Generic)
+  - Cloudflare Outbound Email Sending Client
+  - Multi-User RBAC & OIDC JWT Authentication
+  - Cloudflare Worker Script Deployment Management
+  - Multi-Provider AWS SES Adapter
+  - Production GitHub Actions CI/CD Quality Pipeline
 
 ---
 
 ## License
 
 This project is licensed under the [MIT License](./LICENSE).
+

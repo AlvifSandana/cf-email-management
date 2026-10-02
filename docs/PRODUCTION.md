@@ -44,6 +44,9 @@ In production, EMS runs behind **Traefik** as a reverse proxy with automated Let
 | **Rate Limiting** | In-memory sliding window per IP with `Retry-After: 60` | Configured via `EMS_RATE_LIMIT` (default 120 req/min) |
 | **Network Isolation** | Internal `ems-network` bridge | Database port 5432 is not exposed to public host |
 | **Automated Migrations** | Embedded SQL runs on startup via `migrations.InitSchemaSQL` | Eliminates manual DB migration steps |
+| **CI/CD Quality Gate** | GitHub Actions with tests, race detection, linters, Trivy scan | Pre-deployment verification in `.github/workflows/ci.yml` |
+| **RBAC & OIDC Auth** | JWT bearer token verification with Admin/Operator/Viewer roles | Multi-user least-privilege access control |
+| **Alerting Webhooks** | Multi-channel dispatch (Slack, Discord, Telegram, Generic) | Real-time drift and destination alerts |
 
 ---
 
@@ -137,3 +140,13 @@ If rotating `EMS_MASTER_KEY`:
 1. Decrypt existing credentials using old key.
 2. Re-encrypt with new 32-byte key.
 3. Update database records and `.env`.
+---
+
+## 6. CI/CD Pipeline & Quality Assurance
+
+EMS incorporates an enterprise-grade GitHub Actions CI/CD workflow (`.github/workflows/ci.yml`) triggering on pushes and pull requests to `main`:
+
+1. **Test & Coverage Job**: Runs with Go 1.24, tests all packages with `-race`, verifies module checksums with `go mod verify`, and generates atomic coverage reports.
+2. **Code Lint & Format Job**: Enforces canonical `gofmt` compliance, runs `go vet ./...`, and runs `golangci-lint` (including `staticcheck`).
+3. **Docker Build Job**: Validates that multi-stage `Dockerfile` compiles cleanly to ensure container reproducibility.
+4. **Security Scan Job**: Leverages Aqua Security's Trivy scanner to detect vulnerabilities across repository dependencies and container images.

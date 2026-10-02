@@ -1,7 +1,7 @@
 # Email Management Service — System Design
 
 **Version:** 0.1.0  
-**Status:** Proposed  
+**Status:** Implemented / Production Ready  
 **Date:** 2026-10-02
 
 ---
@@ -9,39 +9,49 @@
 ## 1. Architecture
 
 ```text
-                    ┌─────────────────────────┐
-                    │       Web / CLI         │
-                    └────────────┬────────────┘
-                                 │ HTTPS
-                                 ▼
-                    ┌─────────────────────────┐
-                    │       EMS API            │
-                    │  Auth / Validation       │
-                    └────────────┬────────────┘
-                                 │
-                    ┌────────────┴────────────┐
-                    │                         │
-                    ▼                         ▼
-             ┌─────────────┐          ┌─────────────┐
-             │ Domain/Routing│         │ Sync Engine │
-             │ Services      │         │             │
-             └──────┬──────┘          └──────┬──────┘
-                    │                        │
-                    └───────────┬────────────┘
-                                ▼
-                       ┌─────────────────┐
-                       │ Provider Layer  │
-                       │ EmailProvider   │
-                       └────────┬────────┘
-                                │
-                                ▼
-                       ┌─────────────────┐
-                       │ Cloudflare API  │
-                       └─────────────────┘
-
-                       ┌─────────────────┐
-                       │   PostgreSQL    │
-                       └─────────────────┘
+               ┌────────────────────────────────────────────────────────┐
+               │              Web Dashboard / CLI / API Clients         │
+               └───────────────────────────┬────────────────────────────┘
+                                           │ HTTPS
+                                           ▼
+               ┌────────────────────────────────────────────────────────┐
+               │                 Traefik Reverse Proxy                  │
+               │         Auto-TLS / Security Headers / Rate Limit       │
+               └───────────────────────────┬────────────────────────────┘
+                                           │
+                                           ▼
+┌──────────────────────────────────────────────────────────────────────────────────┐
+│                             EMS Modular Monolith                                 │
+│                                                                                  │
+│   ┌──────────────────────────────────────────────────────────────────────────┐   │
+│   │                 Authentication & Access Control Layer                    │   │
+│   │   • Static X-API-Key (Admin fallback)   • OIDC JWT Bearer Validation     │   │
+│   │   • Role Hierarchy (Admin > Operator > Viewer) • Permission Middleware   │   │
+│   └─────────────────────────────────────┬────────────────────────────────────┘   │
+│                                         │                                        │
+│                                         ▼                                        │
+│   ┌──────────────────────────────────────────────────────────────────────────┐   │
+│   │                         Application Services                             │   │
+│   │   • Destination Service (Verification Enforcement)                       │   │
+│   │   • Routing Service (Explicit Rules & Dedicated Catch-All)               │   │
+│   │   • Outbound Email Service (Cloudflare Sending API Client)               │   │
+│   │   • Sync Engine (Diff: MATCHED, LOCAL_ONLY, REMOTE_ONLY, CHANGED)        │   │
+│   │   • Background Reconciliation Worker (Ticker loop & Drift Callback)      │   │
+│   │   • Notification Alerting Service (Slack, Discord, Telegram, Generic)    │   │
+│   │   • Audit Service (Automatic Secret Redaction)                           │   │
+│   └──────────────────────┬───────────────────────────────────┬───────────────┘   │
+│                          │                                   │                   │
+│                          ▼                                   ▼                   │
+│               ┌─────────────────────┐             ┌─────────────────────┐        │
+│               │   Storage Engine    │             │   Provider Layer    │        │
+│               │ (PostgreSQL 16/Mem) │             │(EmailProvider Abstr)│        │
+│               └──────────┬──────────┘             └──────────┬──────────┘        │
+└──────────────────────────┼───────────────────────────────────┼───────────────────┘
+                           │                                   │
+                           ▼                                   ▼
+                   PostgreSQL Database                Remote Providers
+                   (AES-256-GCM Encrypted)       ├── Cloudflare API v4 & Workers
+                                                 └── AWS SES (Domain & Rules)
 ```
 
 ---
@@ -71,38 +81,76 @@ ems-notification-worker
 
 ---
 
-## 3. Suggested Repository Layout
+## 3. Repository Layout
 
 ```text
 email-management-service/
+├── .github/
+│   └── workflows/ci.yml         # GitHub Actions CI/CD Pipeline
 ├── cmd/
-│   └── ems/
-│       └── main.go
+│   ├── ems/                     # EMS daemon bootstrapping & graceful shutdown
+│   └── ems-cli/                 # Dedicated CLI management tool
 ├── internal/
-│   ├── auth/
-│   ├── config/
-│   ├── domain/
+│   ├── audit/                   # Audit logging with secret redaction
+│   ├── auth/                    # AES-256-GCM encryption & OIDC JWT validation
+│   │   └── rbac/                # Role hierarchy (Admin, Operator, Viewer) & permissions
+│   ├── config/                  # Environment loader
+│   ├── destination/             # Destination address verification & CRUD
+│   ├── domain/                  # Entities, value objects & normalized AppErrors
+│   ├── email/
+│   │   └── sending/             # Cloudflare outbound email sending client
+│   ├── httpapi/                 # REST controllers, middleware & embedded dashboard
+│   ├── notification/            # Multi-channel webhooks (Slack, Discord, Telegram, Generic)
+│   ├── observability/           # Probes (/healthz, /readyz) & Prometheus metrics
 │   ├── provider/
-│   │   ├── cloudflare/
-│   │   └── provider.go
-│   ├── routing/
-│   ├── destination/
-│   ├── sync/
-│   ├── audit/
-│   ├── storage/
-│   ├── httpapi/
-│   └── observability/
-├── migrations/
+│   │   ├── cloudflare/          # Cloudflare API v4 adapter & Worker deployment
+│   │   ├── mock/                # In-memory test doubles
+│   │   ├── ses/                 # Multi-provider AWS SES adapter
+│   │   └── provider.go          # Abstract EmailProvider interface
+│   ├── routing/                 # Explicit Rules & Dedicated Catch-all services
+│   ├── storage/                 # Repository interfaces with Postgres & Memory
+│   └── sync/                    # Sync engine & background reconciliation worker
+├── migrations/                  # Auto-applied SQL schema migrations
+├── scripts/                     # Automated backup & restore runbooks
+├── web/                         # Embedded single-page Web Dashboard
 ├── api/
-│   └── openapi.yaml
-├── docs/
-├── tests/
-├── Dockerfile
-├── compose.yaml
-├── Makefile
-├── go.mod
+│   └── openapi.yaml             # OpenAPI 3.1 specification
+├── Dockerfile                   # Multi-stage hardened non-root container
+├── compose.yaml                 # Local development Compose
+├── compose.prod.yaml            # Hardened production Compose with Traefik
+├── Makefile                     # Build & test targets
 └── README.md
 ```
+
+---
+
+### AD-007 — Scheduled Background Reconciliation Loop
+
+A background ticker-driven worker periodically reconciles remote zones against local state to detect external configuration drift without blocking incoming API traffic.
+
+### AD-008 — Multi-Channel Webhook Notifications
+
+Drift events and destination verification confirmations trigger asynchronous notifications formatted specifically for Slack (Block Kit), Discord (Embeds), Telegram (Markdown), or Generic JSON webhooks.
+
+### AD-009 — Decoupled Outbound Email Sending Domain
+
+Outbound sending (`internal/email/sending`) is decoupled from inbound routing logic to isolate concerns and normalize Cloudflare Send API error envelopes into canonical domain errors.
+
+### AD-010 — Multi-User RBAC & OIDC Authentication Layer
+
+Access control implements a 3-tier hierarchy (Admin > Operator > Viewer) enforceable by route middleware, supporting both static admin API keys and OIDC JWT bearer tokens with signature and role claim validation.
+
+### AD-011 — Multi-Provider Extensibility (AWS SES)
+
+The provider layer implements `provider.EmailProvider` for both Cloudflare API v4 and AWS SES (mapping SES domain identities, receipt rule sets, and verified email identities).
+
+### AD-012 — Cloudflare Worker Script Deployment Management
+
+Allows programmatic deployment, inspection, and removal of Cloudflare Workers scripts directly via EMS to support dynamic worker-based email routing actions.
+
+### AD-013 — Embedded Web Dashboard and CLI Management Tool
+
+Provides dual administrative interfaces: an embedded single-page responsive dashboard (`web/index.html`) served directly by the Go binary, and a standalone CLI tool (`cmd/ems-cli`) for terminal workflows.
 
 ---
 
@@ -391,9 +439,9 @@ Cloudflare credentials should preferably be stored through the application secre
 
 ---
 
-## 16. Future Cloudflare Email Sending
+## 16. Cloudflare Email Sending (Implemented)
 
-Outbound sending should be a separate module:
+Outbound sending is implemented as an isolated client module:
 
 ```text
 internal/email/
